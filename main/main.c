@@ -13,7 +13,13 @@ struct ConnInfo conninfo;
 
 int onConnect(struct ble_gap_event *event, void *arg)
 {
+    struct ble_gap_conn_desc desc;
     gettimeofday(&timeval_s, NULL);
+    ble_gap_conn_find(event->connect.conn_handle, &desc);
+    ESP_LOGI(TAG, "connection established,conn_handle=%d;peer addr:" BT_BD_ADDR_STR,
+             desc.conn_handle, BT_BD_ADDR_HEX(desc.peer_id_addr.val));
+    ESP_LOGI(TAG, "connect interval=%d conn_latency=%d supervision_timeout=%d ",
+             desc.conn_itvl, desc.conn_latency, desc.supervision_timeout);
     conninfo.is_connect = true;
     conninfo.is_first_sync = true;
     conninfo.conn_handle = event->connect.conn_handle;
@@ -23,20 +29,22 @@ int onConnect(struct ble_gap_event *event, void *arg)
 
 int onDisconnect(struct ble_gap_event *event, void *arg)
 {
+    ESP_LOGI(TAG, "disconnect event, reason=%d", event->disconnect.reason);
     conninfo.is_connect = false;
     conninfo.is_first_sync = false;
     conninfo.conn_handle = BLE_HS_CONN_HANDLE_NONE;
     conninfo.connect_ts = 0;
+    bleprph_advertise();
     return 0;
 }
 
 int onNotifyTx(struct ble_gap_event *event, void *arg)
 {
     ESP_LOGI(TAG, "自定义回调，发送通知");
-// #ifdef CONN_EVENT
-//     vTaskDelay(1000);
-//     esp_restart();
-// #endif
+    // #ifdef CONN_EVENT
+    //     vTaskDelay(1000);
+    //     esp_restart();
+    // #endif
     return 0;
 }
 

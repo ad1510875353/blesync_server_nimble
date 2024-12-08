@@ -13,6 +13,7 @@ struct ConnInfo conninfo;
 
 int onConnect(struct ble_gap_event *event, void *arg)
 {
+    set_led_state(1);
     gettimeofday(&timeval_s, NULL);
     conninfo.is_connect = true;
     conninfo.is_first_sync = true;
@@ -23,29 +24,24 @@ int onConnect(struct ble_gap_event *event, void *arg)
 
 int onDisconnect(struct ble_gap_event *event, void *arg)
 {
+    set_led_state(0);
     conninfo.is_connect = false;
     conninfo.is_first_sync = false;
     conninfo.conn_handle = BLE_HS_CONN_HANDLE_NONE;
     conninfo.connect_ts = 0;
+    vTaskDelay(3000);
     return 0;
 }
 
 int onNotifyTx(struct ble_gap_event *event, void *arg)
 {
     ESP_LOGI(TAG, "自定义回调，发送通知");
-// #ifdef CONN_EVENT
-//     vTaskDelay(1000);
-//     esp_restart();
-// #endif
     return 0;
 }
 
 int onSubscribe(struct ble_gap_event *event, void *arg)
 {
     ESP_LOGI(TAG, "自定义回调，订阅");
-#ifdef NOTIFY_EVENT
-    xSemaphoreGive(conn_state.should_sync);
-#endif
     return 0;
 }
 
@@ -53,26 +49,8 @@ int onRead(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ct
 {
     ESP_LOGI(TAG, "自定义回调，读");
     int rc;
-    if (is_notify_time)
-    {
-        rc = os_mbuf_append(ctxt->om, &timeinfo.local_ts, sizeof(timeinfo.local_ts));
-        // is_notify_time = false;
-        xSemaphoreGive(conninfo.should_sync);
-        return rc == 0 ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
-    }
-    else if (is_notify_other)
-    {
-        rc = os_mbuf_append(ctxt->om, &timeinfo.local_ts, 10);
-        ESP_LOGI(TAG, "Send Noise");
-        return rc == 0 ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
-    }
-    else
-    {
-        ESP_LOGI(TAG, "  ");
-        // ESP_LOGI(TAG, "Send Sync Request via handle = %d", data_handle);
-        return 0;
-    }
-    return rc;
+    rc = os_mbuf_append(ctxt->om, &timeinfo.local_ts, sizeof(timeinfo.local_ts));
+    return rc == 0 ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
 }
 
 int onWrite(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg)
@@ -93,34 +71,9 @@ int onWrite(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_c
             conninfo.is_first_sync = false;
             ESP_LOGE(TAG, "local_connect_time = %lld,remote_connect_time = %lld", conninfo.connect_ts, timeinfo.remote_ts);
         }
-        // 通知事件
-        // timeinfo.current_bias = timeinfo.remote_ts - timeinfo.local_ts;
-        // ESP_LOGE(TAG, "sync finished.local_time_us = %lld,remote_time_us = %lld", timeinfo.local_ts, timeinfo.remote_ts);
         return rc;
     }
     return rc;
-}
-
-// 发送一个空白notify作为同步指令
-void sync_task(void *pvParameters)
-{
-    while (1)
-    {
-        if (xSemaphoreTake(conninfo.should_sync, portMAX_DELAY))
-        {
-            // 在server端加干扰
-            // is_notify_time = false;
-            // for(int i=0 ; i< 10; i++)
-            // {
-            //     is_notify_other = true;
-            //     ble_gatts_chr_updated(data_handle);
-            //     vTaskDelay(1);
-            // }
-            is_notify_other = false;
-            vTaskDelay(esp_random() % 3000 + 1000);
-            notify_data_to_central();
-        }
-    }
 }
 
 void app_main(void)
@@ -138,7 +91,4 @@ void app_main(void)
     set_gatt_callbacks(gattcbs);
     ble_init();
     gpio_init();
-#ifdef NOTIFY_EVENT
-    xTaskCreate(sync_task, "sync_task", 2048, NULL, 1, NULL);
-#endif
 }

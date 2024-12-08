@@ -13,8 +13,14 @@ struct ConnInfo conninfo;
 
 int onConnect(struct ble_gap_event *event, void *arg)
 {
+    struct ble_gap_conn_desc desc;
     set_led_state(1);
     gettimeofday(&timeval_s, NULL);
+    ble_gap_conn_find(event->connect.conn_handle, &desc);
+    ESP_LOGI(TAG, "connection established,conn_handle=%d;peer addr:" BT_BD_ADDR_STR,
+             desc.conn_handle, BT_BD_ADDR_HEX(desc.peer_id_addr.val));
+    ESP_LOGI(TAG, "connect interval=%d conn_latency=%d supervision_timeout=%d ",
+             desc.conn_itvl, desc.conn_latency, desc.supervision_timeout);
     conninfo.is_connect = true;
     conninfo.is_first_sync = true;
     conninfo.conn_handle = event->connect.conn_handle;
@@ -25,11 +31,13 @@ int onConnect(struct ble_gap_event *event, void *arg)
 int onDisconnect(struct ble_gap_event *event, void *arg)
 {
     set_led_state(0);
+    ESP_LOGI(TAG, "disconnect event, reason=%d", event->disconnect.reason);
     conninfo.is_connect = false;
     conninfo.is_first_sync = false;
     conninfo.conn_handle = BLE_HS_CONN_HANDLE_NONE;
     conninfo.connect_ts = 0;
     vTaskDelay(3000);
+    bleprph_advertise();
     return 0;
 }
 
@@ -48,32 +56,13 @@ int onSubscribe(struct ble_gap_event *event, void *arg)
 int onRead(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
     ESP_LOGI(TAG, "自定义回调，读");
-    int rc;
-    rc = os_mbuf_append(ctxt->om, &timeinfo.local_ts, sizeof(timeinfo.local_ts));
-    return rc == 0 ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
+    return 0;
 }
 
 int onWrite(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
     ESP_LOGI(TAG, "自定义回调，写");
-    uint8_t data_buf[10];
-    int rc = 0;
-    gettimeofday(&timeval_s, NULL);
-    timeinfo.local_ts = (uint64_t)timeval_s.tv_sec * 1000000L + (uint64_t)timeval_s.tv_usec;
-    // 只处理长度为8的消息
-    if (ctxt->om->om_len == 8)
-    {
-        rc = ble_hs_mbuf_to_flat(ctxt->om, data_buf, ctxt->om->om_len, NULL);
-        timeinfo.remote_ts = *(int64_t *)data_buf;
-        if (conninfo.is_first_sync)
-        {
-            timeinfo.current_bias = timeinfo.remote_ts - conninfo.connect_ts;
-            conninfo.is_first_sync = false;
-            ESP_LOGE(TAG, "local_connect_time = %lld,remote_connect_time = %lld", conninfo.connect_ts, timeinfo.remote_ts);
-        }
-        return rc;
-    }
-    return rc;
+    return 0;
 }
 
 void app_main(void)

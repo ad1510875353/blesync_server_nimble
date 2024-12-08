@@ -16,11 +16,6 @@ static int bleprph_gap_event(struct ble_gap_event *event, void *arg)
     case BLE_GAP_EVENT_CONNECT:
         if (event->connect.status == 0)
         {
-            ble_gap_conn_find(event->connect.conn_handle, &desc);
-            ESP_LOGI(TAG, "connection established,conn_handle=%d;peer addr:" BT_BD_ADDR_STR,
-                     desc.conn_handle, BT_BD_ADDR_HEX(desc.peer_id_addr.val));
-            ESP_LOGI(TAG, "connect interval=%d conn_latency=%d supervision_timeout=%d ",
-                     desc.conn_itvl, desc.conn_latency, desc.supervision_timeout);
             if (gapcbs.OnConnect != NULL)
                 gapcbs.OnConnect(event, arg);
         }
@@ -33,10 +28,8 @@ static int bleprph_gap_event(struct ble_gap_event *event, void *arg)
 
     // 断开连接
     case BLE_GAP_EVENT_DISCONNECT:
-        ESP_LOGI(TAG, "disconnect event, reason=%d", event->disconnect.reason);
         if (gapcbs.OnDisconnect != NULL)
             gapcbs.OnDisconnect(event, arg);
-        bleprph_advertise();
         return 0;
 
     // 广播结束

@@ -53,12 +53,13 @@ struct TimeInfo
 
 enum NotifyType
 {
-    NOTIFY_TIME = 1,
+    NOTIFY_TIME = 0,
     NOTIFY_OTHER
 };
 
 extern struct timeval timeval_s;
 extern struct TimeInfo timeinfo;
 extern struct ConnInfo conninfo;
+extern enum NotifyType notify_type;
 
 #endif // COMMON_H

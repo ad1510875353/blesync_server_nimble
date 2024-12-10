@@ -18,10 +18,12 @@ static void gpio_task(void *arg)
     {
         if (xQueueReceive(gpio_evt_queue, &timeval_s, portMAX_DELAY))
         {
-            timeinfo.local_ts = (uint64_t)timeval_s.tv_sec * 1000000L + (uint64_t)timeval_s.tv_usec + timeinfo.current_bias;
-            if(conninfo.is_connect){
-                ESP_LOGI(TAG, "get IO event, print time: %lld", timeinfo.local_ts);
+            if (conninfo.is_connect)
+            {
+                timeinfo.local_ts = (uint64_t)timeval_s.tv_sec * 1000000L + (uint64_t)timeval_s.tv_usec + timeinfo.current_bias;
+                notify_type = NOTIFY_TIME;
                 notify_data_to_central();
+                ESP_LOGI(TAG, "get IO event, print local time after sync: %lld", timeinfo.local_ts);
             }
         }
     }
@@ -36,8 +38,7 @@ void gpio_init()
         .mode = GPIO_MODE_OUTPUT,
         .pull_up_en = 1,
         .pull_down_en = 0,
-        .intr_type = GPIO_INTR_DISABLE
-    };
+        .intr_type = GPIO_INTR_DISABLE};
     gpio_config(&io_conf);
     gpio_set_level(LED1, 0);
     gpio_set_level(LED2, 0);

@@ -11,8 +11,8 @@ enum NotifyType notify_type = NOTIFY_TIME;
 
 int onConnect(struct ble_gap_event *event, void *arg)
 {
-    struct ble_gap_conn_desc desc;
     gettimeofday(&timeval_s, NULL);
+    struct ble_gap_conn_desc desc;
     ble_gap_conn_find(event->connect.conn_handle, &desc);
     ESP_LOGI(TAG, "connection established,conn_handle=%d;peer addr:" BT_BD_ADDR_STR,
              desc.conn_handle, BT_BD_ADDR_HEX(desc.peer_id_addr.val));
@@ -59,15 +59,13 @@ int onRead(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ct
 // 收到对方发来的时间戳，计算时间偏差
 int onWrite(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
-    gettimeofday(&timeval_s, NULL);
     if (ctxt->om->om_len == 8)
     {
         uint8_t data_buf[8];
         int rc = ble_hs_mbuf_to_flat(ctxt->om, data_buf, ctxt->om->om_len, NULL);
         timeinfo.remote_ts = *(int64_t *)data_buf;
-        timeinfo.local_ts = (uint64_t)timeval_s.tv_sec * 1000000L + (uint64_t)timeval_s.tv_usec;
-        timeinfo.current_bias = timeinfo.remote_ts - timeinfo.local_ts;
-        ESP_LOGE(TAG, "local_time = %lld,remote_time = %lld", timeinfo.local_ts, timeinfo.remote_ts);
+        timeinfo.current_bias = timeinfo.remote_ts - conninfo.connect_ts;
+        ESP_LOGE(TAG, "local_conn_time = %lld,remote_conn_time = %lld", conninfo.connect_ts, timeinfo.remote_ts);
         return rc;
     }
     return 0;
